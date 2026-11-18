@@ -1,0 +1,345 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlanMate model answer",
+  "description": "Exactly one of these objects. Use it for constrained decoding so every answer has the field its action needs.",
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "propose"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "revise": {
+          "type": "boolean"
+        },
+        "plan": {
+          "type": "object",
+          "required": [
+            "items"
+          ],
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "title",
+                  "steps"
+                ],
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "work",
+                      "study",
+                      "personal",
+                      "exercise",
+                      "rest"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "critical",
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "dueDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  },
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "title",
+                        "hours"
+                      ],
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "hours": {
+                          "type": "number",
+                          "maximum": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "constraints": {
+              "type": "object",
+              "properties": {
+                "maxHoursPerDay": {
+                  "type": "number"
+                },
+                "daysOff": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  }
+                },
+                "startDate": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD"
+                },
+                "endDate": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD"
+                }
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "revise",
+        "plan"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "update"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "taskUpdates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "task",
+              "status"
+            ],
+            "properties": {
+              "task": {
+                "type": "string",
+                "description": "T# reference"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not-started",
+                  "ongoing",
+                  "completed"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "taskUpdates"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "remove"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "removals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "session": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "removals"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "assign"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "assignee",
+              "title"
+            ],
+            "properties": {
+              "assignee": {
+                "type": "string",
+                "description": "M# reference"
+              },
+              "title": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "critical",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "dueDate": {
+                "type": "string",
+                "description": "YYYY-MM-DD"
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "assignments"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "email"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "email": {
+          "type": "object",
+          "required": [
+            "task",
+            "reason"
+          ],
+          "properties": {
+            "task": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "email"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "confirm"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        }
+      },
+      "required": [
+        "action",
+        "reply"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "cancel"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        }
+      },
+      "required": [
+        "action",
+        "reply"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "ask"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        }
+      },
+      "required": [
+        "action",
+        "reply"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "chat"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        }
+      },
+      "required": [
+        "action",
+        "reply"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

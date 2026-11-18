@@ -1,0 +1,367 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "propose",
+      "description": "Put a plan on the user's calendar now (no confirm step). revise=true replaces the current plan with this complete one; false adds new separate work.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "revise": {
+            "type": "boolean"
+          },
+          "plan": {
+            "type": "object",
+            "required": [
+              "items"
+            ],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "title",
+                    "steps"
+                  ],
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "category": {
+                      "type": "string",
+                      "enum": [
+                        "work",
+                        "study",
+                        "personal",
+                        "exercise",
+                        "rest"
+                      ]
+                    },
+                    "priority": {
+                      "type": "string",
+                      "enum": [
+                        "critical",
+                        "high",
+                        "medium",
+                        "low"
+                      ]
+                    },
+                    "dueDate": {
+                      "type": "string",
+                      "description": "YYYY-MM-DD"
+                    },
+                    "steps": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "title",
+                          "hours"
+                        ],
+                        "properties": {
+                          "title": {
+                            "type": "string"
+                          },
+                          "hours": {
+                            "type": "number",
+                            "maximum": 2
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "constraints": {
+                "type": "object",
+                "properties": {
+                  "maxHoursPerDay": {
+                    "type": "number"
+                  },
+                  "daysOff": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "description": "YYYY-MM-DD"
+                    }
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "description": "YYYY-MM-DD"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "revise",
+          "plan"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "update",
+      "description": "Record progress on the user's listed tasks.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "taskUpdates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "task",
+                "status"
+              ],
+              "properties": {
+                "task": {
+                  "type": "string",
+                  "description": "T# reference"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "not-started",
+                    "ongoing",
+                    "completed"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "taskUpdates"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "remove",
+      "description": "Delete exactly identified tasks (T#) or sessions (S#). Only when unambiguous.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "removals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "type": "string"
+                },
+                "session": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "removals"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "assign",
+      "description": "Assign a task to a listed teammate (M#). The app runs the workload check itself.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "assignments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "assignee",
+                "title"
+              ],
+              "properties": {
+                "assignee": {
+                  "type": "string",
+                  "description": "M# reference"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "critical",
+                    "high",
+                    "medium",
+                    "low"
+                  ]
+                },
+                "dueDate": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "assignments"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "email",
+      "description": "Draft a message to whoever assigned task T# saying the user can't finish it on time. The user reviews it before sending.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "email": {
+            "type": "object",
+            "required": [
+              "task",
+              "reason"
+            ],
+            "properties": {
+              "task": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "email"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "confirm",
+      "description": "Approve the held assignment or the message under review.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          }
+        },
+        "required": [
+          "reply"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "cancel",
+      "description": "Drop the held assignment or message under review, or undo the current plan.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          }
+        },
+        "required": [
+          "reply"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "ask",
+      "description": "Ask one short question for a missing or ambiguous detail.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          }
+        },
+        "required": [
+          "reply"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "chat",
+      "description": "Answer without changing anything.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          }
+        },
+        "required": [
+          "reply"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+]

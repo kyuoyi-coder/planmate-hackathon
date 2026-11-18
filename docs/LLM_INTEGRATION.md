@@ -152,9 +152,33 @@ LLM_BASE_URL=http://localhost:11434/v1
 LLM_MODEL=planmate
 ```
 
-Optional: `LLM_API_KEY` (sent as a Bearer token), `LLM_TIMEOUT_MS` (default 120000), and `LLM_JSON_MODE=off` if your server rejects the `response_format` field. Restart `npm run dev` after changing these.
+Optional: `LLM_API_KEY` (sent as a Bearer token), `LLM_TIMEOUT_MS` (default 120000), `LLM_JSON_MODE=off` if your server rejects the `response_format` field, `LLM_PROMPT=full` to send the longer example-free contract instead of [docs/model/PLANMATE_SYSTEM_PROMPT.md](model/PLANMATE_SYSTEM_PROMPT.md) (the default, sized for small models), and `LLM_SEND_POLICY=on` to put the model's general policy ([lib/planner/policy.md](../lib/planner/policy.md), ~8k tokens) in front: leave it off for small models. Restart `npm run dev` after changing these.
 
-With `LLM_PROVIDER=mock` (the default), the app uses a small rule-based planner in [lib/planner/mock.ts](../lib/planner/mock.ts) that follows the same contract. It is a stand-in for building and demoing the app, and a source of example input/output pairs; it only understands simple phrasings.
+With `LLM_PROVIDER=mock` (the default, used only when `LLM_PROVIDER` is unset or `mock`; any other unknown value is an error, never a silent fallback), the app uses a small rule-based planner in [lib/planner/mock.ts](../lib/planner/mock.ts) that follows the same contract. It is a stand-in for building and demoing the app, and a source of example input/output pairs; it only understands simple phrasings.
+
+### Agent servers with a single `/chat` endpoint
+
+Some model servers are an agent wrapper rather than a raw model: one `POST /chat` that takes `{"message", "thread_id"}` and returns `{"reply", "blocked", "tool_calls", ...}`, with no system prompt and a cap on the message size. For those:
+
+```
+LLM_PROVIDER=agent-chat
+LLM_BASE_URL=http://10.131.151.20:8000
+```
+
+Optional: `LLM_AGENT_PROMPT` (`inline`, the default; `server` once the server loads [docs/model/PLANMATE_SYSTEM_PROMPT.md](model/PLANMATE_SYSTEM_PROMPT.md) itself; `system` to send the full prompt in a `system` field), `LLM_CHAT_PATH` (default `/chat`), `LLM_MAX_MESSAGE_CHARS` (default 8000), `LLM_API_KEY`, `LLM_TIMEOUT_MS`, and `LLM_REPAIR=off` to skip the one retry PlanMate makes when an answer names an action but lacks its field (for example `assign` without `assignments`). The setup guide for the model server is [docs/model/SERVER_SETUP.md](model/SERVER_SETUP.md).
+
+Each turn sends one message built by `buildCompactMessage` in [lib/planner/prompt.ts](../lib/planner/prompt.ts): a shortened version of the contract above, the user's situation (dates, tasks with their T#/S# references, teammates as M#, any held assignment, message under review or current plan), and the recent conversation. Old turns, then the longest-ago tasks, are dropped to fit the cap. Every turn uses a new `thread_id`, because the message already carries the conversation and the server's memory would otherwise drift from what is on the calendar.
+
+The answer is used as the model gave it; nothing is filled in by the mock:
+
+1. a tool call named after an action (`propose`, `update`, ..., optionally prefixed `planmate_`) whose arguments are the rest of the JSON object is used as that action;
+2. otherwise a JSON object in `reply` is used as the action;
+3. otherwise the text of `reply` is shown to the user as the model's chat answer (so no calendar change happens). A `blocked` reply is shown as it is.
+
+**What the server has to allow.** The wrapper must let the PlanMate message through to the model and let the model answer in JSON. If the agent puts its own system prompt or verifier in front ("I can only use the calculator", "I could not verify a reliable next action"), the model never sees the contract and PlanMate can only show its text. In that case, either:
+
+- serve the raw model as well, at an OpenAI-compatible `/v1/chat/completions` (vLLM, Ollama, LM Studio and llama.cpp all do this), and use `LLM_PROVIDER=openai-compatible`. This is the best option: PlanMate then sends the full contract as the system prompt and asks for JSON mode; or
+- add a PlanMate mode to the agent: no built-in system prompt or verifier for these requests and a cap of at least 8000 characters, returning the model's raw text in `reply`. Alternatively, register the nine actions as tools that are **returned in `tool_calls` without being executed**, since PlanMate does the executing.
 
 ## Checking the model on its own
 

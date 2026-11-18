@@ -122,3 +122,97 @@ ${
 Current plan (already on the calendar; a "propose" with "revise": true replaces it):
 ${context.currentPlan ? JSON.stringify(context.currentPlan) : "(none)"}`;
 }
+
+/**
+ * The same contract as buildSystemPrompt, squeezed into one user message for
+ * agent servers that take a single `message` (no system prompt) with a size
+ * cap. The conversation goes in the message too, so the server needs no
+ * memory of its own. Long task lists and old turns are cut to fit.
+ */
+export function buildCompactMessage(
+  context: PlannerContext,
+  history: { role: "user" | "assistant"; content: string }[],
+  maxChars: number,
+  /** False when the model server already loads the contract (docs/model/). */
+  withContract = true,
+) {
+  const today = dateOf(context.now);
+  const upcoming = Array.from({ length: 14 }, (_, offset) => {
+    const date = addDays(today, offset);
+    return `${date} ${weekdayName(date).slice(0, 3)}`;
+  }).join(", ");
+
+  // Worded in the terms of the model's own policy (agent.md): this block is
+  // the host-supplied structured-action contract, and the situation below is
+  // the trusted runtime context.
+  const contract = `# Structured-action contract (supplied by the PlanMate application)
+The host requires ONE JSON object as your whole output: no Markdown fences, no text around it.
+{"action":"ask|propose|confirm|cancel|update|assign|remove|email|chat","reply":"what the user reads", ...the field for that action}
+- propose: "revise": true|false, "plan": {"items":[{"title":"...","category":"work|study|personal|exercise|rest","priority":"critical|high|medium|low","dueDate":"YYYY-MM-DD","steps":[{"title":"one sitting","hours":1.5}]}],"constraints":{"maxHoursPerDay":5,"daysOff":["YYYY-MM-DD"],"startDate":"YYYY-MM-DD","endDate":"YYYY-MM-DD"}}
+- update: "taskUpdates":[{"task":"T2","status":"not-started|ongoing|completed"}]
+- remove: "removals":[{"task":"T2"}] or [{"session":"S5"}]
+- assign: "assignments":[{"assignee":"M3","title":"...","description":"...","priority":"medium","dueDate":"YYYY-MM-DD"}]
+- email: "email":{"task":"T2","reason":"the user's reason"}
+- ask, confirm, cancel, chat: only "action" and "reply".
+
+# How this version of the app behaves (these replace the defaults in your policy)
+- propose: the scheduler places the plan on the calendar immediately; there is no separate save step. Say it is on their calendar and they can ask for changes or say "undo the plan". Changing the current plan = "revise": true with the COMPLETE new plan. New, separate work = "revise": false with only the new work. Give steps and honest hour estimates only (max 2 h per step); never dates or times inside steps. Split countable work into separate items. "This week" ends on the coming Sunday. "critical" for urgent, "high" for important.
+- cancel also means "undo the plan" (takes the current plan off the calendar), or "no" to a held assignment or message under review.
+- confirm: "yes / assign anyway / send it" to a held assignment or message under review.
+- assign: the app runs the workload check itself and holds the assignment with alternatives if the person is overloaded. Just send "assign".
+- email: the user cannot finish a task that someone assigned them by its due date. The app drafts the message to the assigner and shows it for review; ask for the reason first if missing.
+- remove: only an unambiguous T# or S#; otherwise ask, listing full titles and dates.
+- Reminders one day before a leader-assigned task is due are active in this version.
+- Use only the T#, S# and M# references in the runtime context.`;
+
+  const held = context.heldAssignments?.length
+    ? context.heldAssignments.map((h) => `"${h.title}" to ${h.assignee}, due ${h.dueDate}`).join("; ")
+    : "none";
+  const situation = `
+# Runtime context (trusted, supplied by the PlanMate application)
+Now: ${context.now} (${weekdayName(today)}). User: ${context.userName}. Working hours ${formatClock(context.prefs.dayStart)}-${formatClock(context.prefs.dayEnd)}, max ${formatDuration(context.prefs.maxWorkMinutes)} focused work a day.
+Dates: ${upcoming}
+Teammates: ${context.teammates.length ? context.teammates.map((m) => `${m.ref} ${m.name} (${m.role})`).join(", ") : "none (this user cannot assign)"}
+Held assignment: ${held}. Message under review: ${context.pendingEmail ? `"${context.pendingEmail.task}" to ${context.pendingEmail.to}` : "none"}
+Current plan: ${context.currentPlan ? JSON.stringify(context.currentPlan) : "none"}
+Tasks:`;
+
+  const taskLines = context.tasks.map(
+    (task) =>
+      `${task.ref} ${task.title} [${task.status}] due ${task.dueDate}${task.assignedBy ? `, assigned by ${task.assignedBy}` : ""}` +
+      (task.sessions.length
+        ? `; sessions: ${task.sessions.map((s) => `${s.ref} ${s.date} ${s.start}${s.completed ? " done" : ""}`).join(", ")}`
+        : ""),
+  );
+  const turns = history.map((turn) => `${turn.role === "user" ? "User" : "PlanMate"}: ${turn.content}`);
+
+  // Always keep the latest user turn; drop old turns first, then tasks from
+  // the end of the list (finished ones are listed last).
+  const build = () =>
+    `${withContract ? `${contract}\n` : ""}${situation}\n${taskLines.join("\n") || "none"}\n\nConversation:\n${turns.join("\n")}\n\nRespond to the last User message with the JSON object required by the contract.`;
+  let message = build();
+  while (message.length > maxChars && turns.length > 1) {
+    turns.shift();
+    message = build();
+  }
+  while (message.length > maxChars && taskLines.length) {
+    taskLines.pop();
+    message = build();
+  }
+  if (message.length > maxChars) {
+    turns[turns.length - 1] = turns[turns.length - 1].slice(0, Math.max(200, turns[turns.length - 1].length - (message.length - maxChars)));
+    message = build().slice(0, maxChars);
+  }
+  return message;
+}
+
+/**
+ * Just the runtime context (date, tasks with T#/S#, teammates, pending
+ * decisions), for routes where the instructions come from
+ * docs/model/PLANMATE_SYSTEM_PROMPT.md and the conversation travels as
+ * separate chat messages.
+ */
+export function buildRuntimeContext(context: PlannerContext) {
+  const message = buildCompactMessage(context, [], Number.MAX_SAFE_INTEGER, false);
+  return message.slice(0, message.indexOf("\n\nConversation:")).trim();
+}

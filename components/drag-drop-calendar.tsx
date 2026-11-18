@@ -198,7 +198,7 @@ export default function DragDropCalendar({ blocks }: { blocks: BlockDto[] }) {
       {blocks.length === 0 && (
         <p className="rounded-xl border border-dashed bg-card p-4 text-sm text-muted-foreground">
           Your calendar is empty. Tell PlanMate AI on the right what you need to
-          get done, and confirm the plan it proposes to fill it in.
+          get done, and it will fill it in for you.
         </p>
       )}
       <ToggleCompletedContext value={toggleCompleted}>

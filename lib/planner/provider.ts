@@ -2,6 +2,8 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { dateOf } from "@/lib/time";
+import { resolveUserDates } from "./dates";
 import { mockPlanner } from "./mock";
 import { buildCompactMessage, buildRuntimeContext, buildSystemPrompt } from "./prompt";
 import {
@@ -40,6 +42,9 @@ export async function runPlanner(
 ): Promise<ModelOutput> {
   const provider = providerName();
   if (provider === "mock") return mockPlanner(history, context);
+
+  const lastUser = history.findLast((turn) => turn.role === "user")?.content ?? "";
+  context = { ...context, userDates: resolveUserDates(lastUser, dateOf(context.now)) };
   if (provider === "agent-chat") return callAgentChat(history, context);
 
   const text = await callOpenAiCompatible(history, context);
@@ -73,6 +78,18 @@ function readOnce(...path: string[]) {
  * than everything else together, and servers with a short context window
  * cut the start of the prompt, which is where the instructions are.
  */
+/** The instruction file alone (plus the policy when switched on), no context. */
+function staticPrompt() {
+  const compact = readOnce("docs", "model", "PLANMATE_SYSTEM_PROMPT.md");
+  if (!compact) return null;
+  const policy = process.env.LLM_SEND_POLICY === "on" ? readOnce("lib", "planner", "policy.md") : null;
+  return policy ? `${policy}
+
+---
+
+${compact}` : compact;
+}
+
 function systemPrompt(context: PlannerContext) {
   const compact = readOnce("docs", "model", "PLANMATE_SYSTEM_PROMPT.md");
   const contract =
@@ -131,14 +148,19 @@ async function callAgentChat(
   const mode = process.env.LLM_AGENT_PROMPT?.trim() || "inline";
   const message = buildCompactMessage(context, history, maxChars, mode === "inline");
 
-  const system = mode === "system" ? systemPrompt(context) : undefined;
+  // The message already carries the runtime context, so the `system` field
+  // only needs the instructions themselves.
+  const system = mode === "system" ? staticPrompt() ?? systemPrompt(context) : undefined;
   const first = await postAgent(baseUrl, path, message, system);
   if (first.kind === "output") return first.output;
 
   // Small models often pick the right action but leave out the field that
   // carries it ("assign" with no "assignments"). Hand the answer back once
   // with the exact problem, as a tool would return a validation error.
-  const problem = process.env.LLM_REPAIR === "off" ? null : contractProblem(first.text);
+  const problem =
+    process.env.LLM_REPAIR === "off"
+      ? null
+      : (contractProblem(first.text) ?? askedForGivenDates(first.text, context));
   if (problem) {
     const retry = `${message}
 
@@ -148,7 +170,7 @@ ${first.text}
 That answer is not usable: ${problem}
 Answer again with the complete, corrected JSON object only.`;
     const second = await postAgent(baseUrl, path, retry, system).catch(() => null);
-    if (second?.kind === "text" && !contractProblem(second.text)) {
+    if (second?.kind === "text" && !contractProblem(second.text) && !askedForGivenDates(second.text, context)) {
       return parseModelOutput(second.text);
     }
     console.warn("[planner] the model's answer was still incomplete after one retry:", problem);
@@ -232,6 +254,19 @@ const REQUIRED_FIELD = {
     shape: '"email": {"task": "T1", "reason": "..."}',
   },
 } as const;
+
+/**
+ * The model asked for a deadline or period the user already gave ("this
+ * week", "by Friday"), which small models do a lot. Returns the correction
+ * to send back, or null.
+ */
+function askedForGivenDates(text: string, context: PlannerContext): string | null {
+  if (!context.userDates?.length) return null;
+  const parsed = parseModelOutput(text);
+  if (parsed.action !== "ask" && !(parsed.action === "propose" && !("plan" in parsed))) return null;
+  if (!/deadline|due|when|date|by what|timeline|time ?frame|which day|how long/i.test(parsed.reply)) return null;
+  return `you asked about timing, but the user already gave it: ${context.userDates.join(" ")} Do not ask. Make reasonable assumptions, mention them in "reply", and answer with "propose" and the complete plan.`;
+}
 
 /**
  * What is wrong with a JSON answer that names an action but lacks the field

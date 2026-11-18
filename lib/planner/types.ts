@@ -238,6 +238,11 @@ export type ChatTurn = { role: "user" | "assistant"; content: string };
 export type PlannerContext = {
   /** The user's local wall-clock time, "YYYY-MM-DDTHH:mm". */
   now: string;
+  /**
+   * Time phrases in the user's latest message resolved to exact dates
+   * (lib/planner/dates.ts), so the model does not have to work them out.
+   */
+  userDates?: string[];
   userName: string;
   prefs: { dayStart: number; dayEnd: number; maxWorkMinutes: number };
   /** The user's tasks. `ref` ("T1", "T2", …) is how the model points at one. */

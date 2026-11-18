@@ -95,7 +95,9 @@ When you propose, say in "reply" that the plan is on their calendar, and that th
 User: ${context.userName}
 Now: ${context.now} (${weekdayName(today)})
 Upcoming dates: ${upcoming}
-Working hours: ${formatClock(context.prefs.dayStart)}-${formatClock(context.prefs.dayEnd)}
+${context.userDates?.length ? `Dates in the user's latest message (already worked out, use them; do not ask the user for these):
+${context.userDates.map((line) => `- ${line}`).join("\n")}
+` : ""}Working hours: ${formatClock(context.prefs.dayStart)}-${formatClock(context.prefs.dayEnd)}
 Daily focused-work limit: ${formatDuration(context.prefs.maxWorkMinutes)}
 
 Their tasks (reference: title [status]), each followed by its calendar sessions:
@@ -172,7 +174,9 @@ The host requires ONE JSON object as your whole output: no Markdown fences, no t
 # Runtime context (trusted, supplied by the PlanMate application)
 Now: ${context.now} (${weekdayName(today)}). User: ${context.userName}. Working hours ${formatClock(context.prefs.dayStart)}-${formatClock(context.prefs.dayEnd)}, max ${formatDuration(context.prefs.maxWorkMinutes)} focused work a day.
 Dates: ${upcoming}
-Teammates: ${context.teammates.length ? context.teammates.map((m) => `${m.ref} ${m.name} (${m.role})`).join(", ") : "none (this user cannot assign)"}
+${context.userDates?.length ? `Dates in the user's latest message (already worked out, use them; do not ask the user for these):
+${context.userDates.map((line) => `- ${line}`).join("\n")}
+` : ""}Teammates: ${context.teammates.length ? context.teammates.map((m) => `${m.ref} ${m.name} (${m.role})`).join(", ") : "none (this user cannot assign)"}
 Held assignment: ${held}. Message under review: ${context.pendingEmail ? `"${context.pendingEmail.task}" to ${context.pendingEmail.to}` : "none"}
 Current plan: ${context.currentPlan ? JSON.stringify(context.currentPlan) : "none"}
 Tasks:`;

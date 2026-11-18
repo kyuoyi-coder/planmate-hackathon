@@ -1,26 +1,275 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  --color-navy: var(--navy);
+  --color-clay: var(--clay);
+  --color-clay-foreground: var(--clay-foreground);
+  --color-warn: var(--warn-text);
+  --color-danger: var(--danger-text);
+  --color-lime: var(--lime);
+  --color-ice: var(--ice);
+  --animate-aurora: aurora 20s ease-in-out infinite;
+  --color-paper: var(--paper);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
   --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-display);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/*
+ * PlanMate's palettes. The <html> element carries `light` or `dark`, set
+ * before the first paint by the script in app/layout.tsx from the user's
+ * choice (Light, Dark or System). Both palettes share the same accents:
+ * lime for primary actions and "done", ember for what needs attention, ice
+ * for study. The aurora behind the shell uses the same three.
+ */
+:root {
+  color-scheme: light;
+  --paper: #f6f7f3;
+  --navy: #121a15; /* main text colour; kept under its original name */
+  --clay: #c8501f; /* ember */
+  --clay-foreground: #ffffff;
+  --lime: #65a30d;
+  --ice: #2f7fc4;
+  --warn-text: #9a3412;
+  --danger-text: #b42318;
+  --background: var(--paper);
+  --foreground: #1b211d;
+  --card: #ffffff;
+  --card-foreground: #1b211d;
+  --popover: #ffffff;
+  --popover-foreground: #1b211d;
+  --primary: #4d7c0f;
+  --primary-foreground: #ffffff;
+  --secondary: #ebeee6;
+  --secondary-foreground: #1b211d;
+  --muted: #eef0ea;
+  --muted-foreground: #5c645e;
+  --accent: #e9f4d4;
+  --accent-foreground: #3f6212;
+  --destructive: #c62828;
+  --border: rgb(18 26 21 / 0.1);
+  --input: rgb(18 26 21 / 0.16);
+  --ring: var(--primary);
+  --chart-1: #65a30d;
+  --chart-2: #3b86c9;
+  --chart-3: #e0652f;
+  --chart-4: #a3a8a4;
+  --chart-5: #dcdfd8;
+  --radius: 1rem;
+  --sidebar: rgb(255 255 255 / 0.72);
+  --sidebar-foreground: #1b211d;
+  --sidebar-primary: #4d7c0f;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(18 26 21 / 0.05);
+  --sidebar-accent-foreground: #121a15;
+  --sidebar-border: rgb(18 26 21 / 0.08);
+  --sidebar-ring: var(--primary);
+  /* Calendar blocks for study tasks and high-priority tasks. */
+  --event-study-bg: #dcebfa;
+  --event-study-fg: #173a5c;
+  --event-study-border: #a9cdef;
+  --event-high-bg: #fde6d3;
+  --event-high-fg: #8a2f0c;
+  --event-high-border: #f2a774;
+  /* Texture and depth. */
+  --dot: rgb(18 26 21 / 0.1);
+  --sheet-highlight: rgb(255 255 255 / 0.9);
+  --sheet-shadow: rgb(18 26 21 / 0.22);
+}
+
+.dark {
+  color-scheme: dark;
+  --paper: #0a0b0d;
+  --navy: #eef1ea;
+  --clay: #f08a5d;
+  --clay-foreground: #2a1206;
+  --lime: #c4f26a;
+  --ice: #8ecbff;
+  --warn-text: #ffc9ad;
+  --danger-text: #ffb4ac;
+  --background: var(--paper);
+  --foreground: #e6e8e3;
+  --card: #121418;
+  --card-foreground: #e6e8e3;
+  --popover: #16181d;
+  --popover-foreground: #e6e8e3;
+  --primary: var(--lime);
+  --primary-foreground: #141c04;
+  --secondary: #1e2229;
+  --secondary-foreground: #e6e8e3;
+  --muted: #191c21;
+  --muted-foreground: #9aa0a9;
+  --accent: #232a18;
+  --accent-foreground: #d9f59a;
+  --destructive: #ff6b5e;
+  --border: rgb(255 255 255 / 0.09);
+  --input: rgb(255 255 255 / 0.14);
+  --ring: var(--lime);
+  --chart-1: #c4f26a;
+  --chart-2: #8ecbff;
+  --chart-3: #f08a5d;
+  --chart-4: #6b7280;
+  --chart-5: #3a3f4b;
+  --sidebar: rgb(13 15 18 / 0.72);
+  --sidebar-foreground: #e6e8e3;
+  --sidebar-primary: var(--lime);
+  --sidebar-primary-foreground: #141c04;
+  --sidebar-accent: rgb(255 255 255 / 0.06);
+  --sidebar-accent-foreground: #eef1ea;
+  --sidebar-border: rgb(255 255 255 / 0.09);
+  --sidebar-ring: var(--lime);
+  --event-study-bg: #17283a;
+  --event-study-fg: #cfe6ff;
+  --event-study-border: #2c4763;
+  --event-high-bg: #3a2418;
+  --event-high-fg: #ffc9ad;
+  --event-high-border: #f08a5d;
+  --dot: rgb(255 255 255 / 0.07);
+  --sheet-highlight: rgb(255 255 255 / 0.06);
+  --sheet-shadow: rgb(0 0 0 / 0.9);
+}
+
+/*
+ * The 21st.dev prompt box (components/ui/prompt-composer) is drawn for dark
+ * backgrounds. In light mode, retint the parts PlanMate shows.
+ */
+:root:not(.dark) .ppc-root {
+  --ppc-fg: #1b211d;
+  --ppc-mute: #5c645e;
+  --ppc-line: rgb(18 26 21 / 0.1);
+  --ppc-glass: rgb(255 255 255 / 0.78);
+}
+:root:not(.dark) .ppc-card {
+  box-shadow:
+    inset 0 0 0 1px var(--ppc-line),
+    0 18px 50px -24px rgb(18 26 21 / 0.3);
+}
+:root:not(.dark) .ppc-card:focus-within {
+  box-shadow:
+    inset 0 0 0 1px rgb(77 124 15 / 0.45),
+    0 0 0 5px rgb(77 124 15 / 0.08),
+    0 18px 50px -24px rgb(18 26 21 / 0.35);
+}
+:root:not(.dark) .ppc-sheen {
+  background: radial-gradient(
+    420px circle at var(--mx) var(--my),
+    rgb(101 163 13 / 0.07),
+    transparent 55%
+  );
+}
+:root:not(.dark) .ppc-ph {
+  color: #868d88;
+}
+:root:not(.dark) .ppc-chip {
+  color: #4b524d;
+  background: rgb(18 26 21 / 0.05);
+  box-shadow: inset 0 0 0 1px rgb(18 26 21 / 0.08);
+}
+:root:not(.dark) .ppc-chip:hover {
+  color: #1b211d;
+  background: rgb(18 26 21 / 0.09);
+}
+:root:not(.dark) .ppc-chip[aria-checked="true"] {
+  color: #1b211d;
+  background: rgb(101 163 13 / 0.14);
+  box-shadow: inset 0 0 0 1px rgb(77 124 15 / 0.35);
+}
+:root:not(.dark) .ppc-chip[aria-checked="true"] .ppc-icon {
+  fill: #4d7c0f;
+}
+
+/* Drift of the aurora lights (components/ui/aurora.tsx, from 21st.dev). */
+@keyframes aurora {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  33% {
+    transform: translate3d(8%, 6%, 0) rotate(12deg) scale(1.08);
+  }
+  66% {
+    transform: translate3d(-6%, 10%, 0) rotate(-8deg) scale(0.96);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-foreground);
+  }
+}
+
+@layer utilities {
+  /* A faint dot grid over the canvas. */
+  .dot-grid {
+    background-image: radial-gradient(
+      circle,
+      var(--dot) 1px,
+      transparent 1.4px
+    );
+    background-size: 22px 22px;
+  }
+  /* A glass sheet: a hairline of light on top, depth underneath. */
+  .sheet {
+    box-shadow:
+      inset 0 1px 0 var(--sheet-highlight),
+      0 18px 50px -24px var(--sheet-shadow);
+  }
+  /* Frosted panels that let the aurora glow through. */
+  .glass {
+    background: var(--sidebar);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+  }
 }

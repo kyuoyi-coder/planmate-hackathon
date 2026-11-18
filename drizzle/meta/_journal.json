@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794823121245,
+      "tag": "0000_careless_baron_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794829843608,
+      "tag": "0001_flaky_eternals",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794898958861,
+      "tag": "0002_quick_wild_pack",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794981628267,
+      "tag": "0003_bitter_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794983284565,
+      "tag": "0004_charming_solo",
+      "breakpoints": true
+    }
+  ]
+}

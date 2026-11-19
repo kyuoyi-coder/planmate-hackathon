@@ -11,6 +11,7 @@ import { checkWorkload, formatDay } from "@/lib/workload";
 import { composeCannotFinishEmail } from "@/lib/email";
 import type { Tx } from "@/lib/notifications";
 import { ModelError, runPlanner } from "./provider";
+import { describeEvent, occurrencesOf } from "./events";
 import { buildProposal } from "./scheduler";
 import type {
   AssignmentStatus,
@@ -481,6 +482,7 @@ export async function handleChatMessage(input: {
       start: schema.blocks.start,
       end: schema.blocks.end,
       completed: schema.blocks.completed,
+      seriesId: schema.blocks.seriesId,
     })
     .from(schema.blocks)
     .where(eq(schema.blocks.userId, user.id))
@@ -489,6 +491,27 @@ export async function handleChatMessage(input: {
   const sessions = sessionRows
     .filter((row) => row.taskId && taskIds.has(row.taskId))
     .map((row, index) => ({ ...row, ref: `S${index + 1}` }));
+
+  // Fixed events still ahead ("a meeting every Friday at 2pm"), one entry per
+  // series, so the model can refer to one as "E1".
+  const fixedEvents = (() => {
+    const upcoming = sessionRows.filter((row) => row.seriesId && row.end >= now);
+    const bySeries = new Map<string, typeof upcoming>();
+    for (const row of upcoming) bySeries.set(row.seriesId!, [...(bySeries.get(row.seriesId!) ?? []), row]);
+    return [...bySeries.entries()].map(([seriesId, rows], index) => {
+      const first = rows[0];
+      const minutes = minutesOf(first.end) - minutesOf(first.start);
+      const weekly = rows.length > 1;
+      return {
+        ref: `E${index + 1}`,
+        seriesId,
+        title: first.title,
+        when:
+          describeEvent({ title: first.title, date: dateOf(first.start), start: first.start.slice(11), minutes, repeat: weekly ? "weekly" : "none" }).replace(/^"[^"]*" /, "") +
+          (weekly ? `, ${rows.length} times` : ""),
+      };
+    });
+  })();
 
   // Only the people this user's role may assign to are offered to the model.
   const teammates = (
@@ -541,6 +564,7 @@ export async function handleChatMessage(input: {
         role: ROLE_LABEL[member.role],
       })),
       currentPlan: currentPlan?.plan?.intent,
+      events: fixedEvents.map(({ ref, title, when }) => ({ ref, title, when })),
       pendingEmail: emailMessage?.email
         ? { task: emailMessage.email.taskTitle, to: emailMessage.email.toName }
         : undefined,
@@ -716,6 +740,22 @@ export async function handleChatMessage(input: {
     const removed: string[] = [];
     const refused: string[] = [];
     for (const removal of output.removals) {
+      // A fixed event: every copy still ahead goes (past ones stay as a record).
+      if (removal.event) {
+        const event = fixedEvents.find((candidate) => candidate.ref.toLowerCase() === removal.event!.toLowerCase());
+        if (!event) continue;
+        await db
+          .delete(schema.blocks)
+          .where(
+            and(
+              eq(schema.blocks.userId, user.id),
+              eq(schema.blocks.seriesId, event.seriesId),
+              gte(schema.blocks.end, now),
+            ),
+          );
+        removed.push(`"${event.title}" (${event.when})`);
+        continue;
+      }
       // A single session: the task stays unless this was its last one.
       if (removal.session) {
         const sessionKey = removal.session.toLowerCase();
@@ -848,6 +888,52 @@ export async function handleChatMessage(input: {
     settled.planMessageId = currentPlan.id;
     dataChanged = true;
     assistantMessage = await addAssistantMessage(session.id, reply);
+  } else if (output.action === "event" && output.events) {
+    // Fixed events go on the calendar exactly as said; planned work and the
+    // scheduler treat them as busy time from now on.
+    const added: string[] = [];
+    const clashes = new Set<string>();
+    let assumedLength = false;
+    await db.transaction(async (tx) => {
+      for (const event of output.events!) {
+        const seriesId = randomUUID();
+        const copies = occurrencesOf(event);
+        for (const copy of copies) {
+          for (const row of sessionRows) {
+            if (row.start < copy.end && row.end > copy.start && row.end >= now) {
+              clashes.add(`"${row.title}" on ${formatDay(dateOf(row.start))}`);
+            }
+          }
+        }
+        await tx.insert(schema.blocks).values(
+          copies.map((copy) => ({
+            id: randomUUID(),
+            userId: user.id,
+            title: event.title,
+            start: copy.start,
+            end: copy.end,
+            category: event.category,
+            seriesId,
+          })),
+        );
+        assumedLength ||= event.lengthAssumed === true;
+        added.push(
+          describeEvent(event) + (event.repeat === "weekly" ? ` (the next ${copies.length} weeks)` : ""),
+        );
+      }
+    });
+    dataChanged = true;
+    const reply = [
+      `Done, I added ${added.join(" and ")} to your calendar.`,
+      assumedLength ? "I assumed it lasts an hour; tell me if it's longer." : "",
+      clashes.size
+        ? `Heads up: it overlaps ${[...clashes].slice(0, 3).join(", ")}${clashes.size > 3 ? ` and ${clashes.size - 3} more` : ""}.`
+        : "",
+      "New plans will work around it.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    assistantMessage = await addAssistantMessage(session.id, reply);
   } else {
     assistantMessage = await addAssistantMessage(
       session.id,
@@ -890,17 +976,6 @@ async function findOwnMessage(user: CurrentUser, messageId: string, what: string
     );
   if (!row) throw new HttpError(404, `${what} not found.`);
   return row.message;
-}
-
-/** The "Undo" button on a plan card: takes that plan off the calendar. */
-export async function undoPlanFromCard(user: CurrentUser, messageId: string) {
-  const message = await findOwnMessage(user, messageId, "Plan");
-  const reply = await undoPlan(user.id, message);
-  const assistantMessage = await addAssistantMessage(message.sessionId, reply);
-  return {
-    planStatus: "discarded" as const,
-    message: toMessageDto(assistantMessage),
-  };
 }
 
 /**

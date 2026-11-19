@@ -120,7 +120,7 @@ The team directory: everyone in the workspace with their role (Team leader, Sub-
 
 | You say | What happens |
 | --- | --- |
-| "This week I have 2 assignments, 3 papers to review, and I want to study ML" | **Plan.** It breaks the work into sessions and puts them on your calendar across this week. The plan card has an **Undo** button. |
+| "This week I have 2 assignments, 3 papers to review, and I want to study ML" | **Plan.** It breaks the work into sessions and puts them on your calendar across this week. To change it or take it off again, you just tell the agent. |
 | "Plan next week: 1 urgent report and 1 presentation" | **Plan for next week only.** The plan starts next Monday and nothing is put in the current week. |
 | "Max 4 hours a day and keep Sunday free" | **Reschedule.** The plan on your calendar is rebuilt with the new limits. |
 | "Move it to next week" | **Reschedule.** The same plan moves to next week. |

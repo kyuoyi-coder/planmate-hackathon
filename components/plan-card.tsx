@@ -2,8 +2,7 @@
 
 import { BorderBeam } from "border-beam";
 import { useResolvedTheme } from "@/lib/theme";
-import { AlertTriangle, CalendarCheck, Undo2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { AlertTriangle, CalendarCheck } from "lucide-react";
 import type { Proposal } from "@/lib/planner/types";
 import { dateOf, formatDuration, fromNaive } from "@/lib/time";
 
@@ -23,19 +22,15 @@ const STATUS_NOTE: Record<Exclude<PlanStatus, "confirmed">, string> = {
 };
 
 /**
- * A plan the assistant has put on the calendar. To change it the user just
- * tells the assistant; Undo takes it off again.
+ * A plan the assistant has put on the calendar. To change it, or take it
+ * off again, the user tells the assistant.
  */
 export default function PlanCard({
   proposal,
   status,
-  busy,
-  onUndo,
 }: {
   proposal: Proposal;
   status: PlanStatus;
-  busy: boolean;
-  onUndo: () => void;
 }) {
   const theme = useResolvedTheme();
   const isLive = status === "confirmed";
@@ -145,22 +140,11 @@ export default function PlanCard({
       )}
 
       {isLive ? (
-        <footer className="flex items-center justify-between gap-2">
+        <footer>
           <p className="text-[11px] text-muted-foreground">
-            Want changes? Just tell me, e.g. &ldquo;max 4 hours a day&rdquo; or
-            &ldquo;move it to next week&rdquo;.
+            Want changes? Just tell me, e.g. &ldquo;max 4 hours a day&rdquo;,
+            &ldquo;move it to next week&rdquo; or &ldquo;undo the plan&rdquo;.
           </p>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="shrink-0"
-            disabled={busy}
-            onClick={onUndo}
-          >
-            <Undo2 aria-hidden="true" />
-            Undo
-          </Button>
         </footer>
       ) : (
         <p className="text-xs font-medium text-muted-foreground">

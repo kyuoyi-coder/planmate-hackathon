@@ -54,6 +54,8 @@ type Day = {
   occupied: Interval[];
   existingWork: number;
   plannedWork: number;
+  /** Minutes of personal activities already placed this evening. */
+  plannedLeisure: number;
 };
 
 type Unit = {
@@ -143,7 +145,7 @@ export function buildProposal(
     const date = addDays(today, offset);
     const dayStart = `${date}T00:00`;
     const nextDay = `${addDays(date, 1)}T00:00`;
-    const day: Day = { date, occupied: [], existingWork: 0, plannedWork: 0 };
+    const day: Day = { date, occupied: [], existingWork: 0, plannedWork: 0, plannedLeisure: 0 };
 
     for (const block of context.busy) {
       if (block.end <= dayStart || block.start >= nextDay) continue;
@@ -156,10 +158,16 @@ export function buildProposal(
   });
 
   const dueIndex = (itemIndex: number) =>
-    Math.min(
-      diffDays(today, dueDates[itemIndex] ?? horizonEnd),
-      days.length - 1,
+    Math.max(
+      Math.min(diffDays(today, dueDates[itemIndex] ?? horizonEnd), days.length - 1),
+      startIndex(itemIndex),
     );
+  // First day an item may use: its own startDate (an item moved to next
+  // week), never before the plan starts.
+  function startIndex(itemIndex: number) {
+    const start = intent.items[itemIndex].startDate;
+    return start && start > today ? Math.min(diffDays(today, start), days.length - 1) : 0;
+  }
 
   // --- Ordering: nearest deadline first, then priority; items interleaved ---
   const unitsByItem = toUnits(intent);
@@ -181,9 +189,11 @@ export function buildProposal(
         unit,
         // Centred in its share of the window, so a single-session item lands
         // mid-range instead of always on the first day.
-        ideal: Math.floor(
-          ((position + 0.5) * (dueIndex(itemIndex) + 1)) / units.length,
-        ),
+        ideal:
+          startIndex(itemIndex) +
+          Math.floor(
+            ((position + 0.5) * (dueIndex(itemIndex) - startIndex(itemIndex) + 1)) / units.length,
+          ),
       }));
     })
     .sort((a, b) => a.ideal - b.ideal);
@@ -191,12 +201,15 @@ export function buildProposal(
   // --- Placement ------------------------------------------------------------
   const blocks: ProposedBlock[] = [];
   const lastDayOfItem = new Map<number, number>();
+  // Where an item's latest session ends on that day: its next step can't go
+  // earlier the same day ("Finalize" before "Write the draft").
+  const lastEndOfItem = new Map<number, number>();
   const lateItems = new Set<string>();
 
   const tryDay = (
     unit: Unit,
     index: number,
-    options: { overLimit?: boolean } = {},
+    options: { overLimit?: boolean; anyTime?: boolean } = {},
   ) => {
     const day = days[index];
     if (daysOff.has(day.date)) return null;
@@ -207,15 +220,20 @@ export function buildProposal(
       return null;
     }
 
-    const earliest = index === 0 && startsToday ? nowMinutes : 0;
-    // Focused work goes in working hours; personal items go in the evening,
-    // falling back to any free time in the day.
+    const earliest = Math.max(
+      index === 0 && startsToday ? nowMinutes : 0,
+      lastDayOfItem.get(unit.itemIndex) === index ? (lastEndOfItem.get(unit.itemIndex) ?? 0) : 0,
+    );
+    // Focused work goes in working hours; personal items go in the evening.
+    // Only when no evening has room (`anyTime`) may they use free daytime.
     const windows: Interval[] = focus
       ? [[prefs.dayStart, options.overLimit ? LATE_END : prefs.dayEnd]]
-      : [
-          [prefs.dayEnd, EVENING_END],
-          [prefs.dayStart, EVENING_END],
-        ];
+      : options.anyTime
+        ? [
+            [prefs.dayEnd, EVENING_END],
+            [prefs.dayStart, EVENING_END],
+          ]
+        : [[prefs.dayEnd, EVENING_END]];
     const occupied = focus ? [...day.occupied, LUNCH] : day.occupied;
 
     for (const [lo, hi] of windows) {
@@ -229,7 +247,9 @@ export function buildProposal(
     const day = days[index];
     day.occupied.push([start, start + unit.minutes + BREAK]);
     if (isFocusWork(unit.category)) day.plannedWork += unit.minutes;
+    else day.plannedLeisure += unit.minutes;
     lastDayOfItem.set(unit.itemIndex, index);
+    lastEndOfItem.set(unit.itemIndex, start + unit.minutes);
     blocks.push({
       itemIndex: unit.itemIndex,
       title: unit.title,
@@ -243,24 +263,32 @@ export function buildProposal(
     const item = intent.items[unit.itemIndex];
     const due = dueIndex(unit.itemIndex);
     const previous = lastDayOfItem.get(unit.itemIndex);
-    const first = Math.min(previous ?? 0, due);
+    const first = Math.max(startIndex(unit.itemIndex), Math.min(previous ?? 0, due));
 
-    let best: { index: number; start: number; score: number } | undefined;
-    for (let index = first; index <= due; index++) {
-      const start = tryDay(unit, index);
-      if (start === null) continue;
-      const day = days[index];
-      const weekend = [0, 6].includes(weekdayOf(day.date));
-      // Lower is better: prefer lighter days, near the ideal day. Slipping
-      // later costs more than starting early, so work doesn't pile up at the end.
-      const score =
-        day.existingWork +
-        day.plannedWork +
-        (index > ideal ? 90 * (index - ideal) : 30 * (ideal - index)) +
-        (index === previous ? 90 : 0) +
-        (weekend ? 45 : 0);
-      if (!best || score < best.score) best = { index, start, score };
-    }
+    const focusUnit = isFocusWork(unit.category);
+    const pickBest = (options: { anyTime?: boolean } = {}) => {
+      let best: { index: number; start: number; score: number } | undefined;
+      for (let index = first; index <= due; index++) {
+        const start = tryDay(unit, index, options);
+        if (start === null) continue;
+        const day = days[index];
+        const weekend = [0, 6].includes(weekdayOf(day.date));
+        // Lower is better: prefer lighter days, near the ideal day. Slipping
+        // later costs more than starting early, so work doesn't pile up at the end.
+        // Personal activities also spread out over the evenings.
+        const score =
+          day.existingWork +
+          day.plannedWork +
+          (focusUnit ? 0 : 2 * day.plannedLeisure) +
+          (index > ideal ? 90 * (index - ideal) : 30 * (ideal - index)) +
+          (index === previous ? 90 : 0) +
+          (weekend ? 45 : 0);
+        if (!best || score < best.score) best = { index, start, score };
+      }
+      return best;
+    };
+    // A personal activity tries every evening before any daytime slot.
+    const best = pickBest() ?? (focusUnit ? undefined : pickBest({ anyTime: true }));
     if (best) {
       place(unit, best.index, best.start);
       continue;
@@ -269,8 +297,8 @@ export function buildProposal(
     // No room before the deadline within the daily limit: prefer running late
     // over overloading a day.
     let placed = false;
-    for (let index = Math.max(due + 1, previous ?? 0); index < days.length; index++) {
-      const start = tryDay(unit, index);
+    for (let index = Math.max(due + 1, previous ?? 0, startIndex(unit.itemIndex)); index < days.length; index++) {
+      const start = tryDay(unit, index, { anyTime: true });
       if (start === null) continue;
       place(unit, index, start);
       lateItems.add(item.title);
@@ -280,7 +308,7 @@ export function buildProposal(
     if (placed) continue;
 
     for (let index = first; index <= due && !placed; index++) {
-      const start = tryDay(unit, index, { overLimit: true });
+      const start = tryDay(unit, index, { overLimit: true, anyTime: true });
       if (start === null) continue;
       place(unit, index, start);
       warnings.add(

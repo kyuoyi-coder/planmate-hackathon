@@ -12,7 +12,7 @@ The user types what they need to get done. Your model's job is the thinking:
 
 Your model does **not** pick dates or clock times. A scheduler in the app does that from your model's output: it spreads the sessions across the days before each deadline, keeps each day under the user's limit, adds breaks, and avoids what is already on the calendar. This split is deliberate. Small models are unreliable at date arithmetic, and it means the model can be trained on a much simpler task.
 
-A plan goes onto the user's calendar as soon as your model proposes it; there is no confirmation step. The user changes it by chatting ("max 4 hours a day", "move it to next week"), which your model answers with a revised plan that replaces it, or takes it off again ("undo the plan", or the Undo button on the plan card). Once the user has started on a plan (ticked a session or changed a task's status), it is kept and can no longer be replaced as a whole.
+A plan goes onto the user's calendar as soon as your model proposes it; there is no confirmation step. The user changes it by chatting ("max 4 hours a day", "move it to next week"), which your model answers with a revised plan that replaces it, or takes it off again ("undo the plan"). Every change goes through the chat; the plan card has no buttons. Once the user has started on a plan (ticked a session or changed a task's status), it is kept and can no longer be replaced as a whole.
 
 ## How the app calls the model
 
@@ -179,6 +179,24 @@ The answer is used as the model gave it; nothing is filled in by the mock:
 
 - serve the raw model as well, at an OpenAI-compatible `/v1/chat/completions` (vLLM, Ollama, LM Studio and llama.cpp all do this), and use `LLM_PROVIDER=openai-compatible`. This is the best option: PlanMate then sends the full contract as the system prompt and asks for JSON mode; or
 - add a PlanMate mode to the agent: no built-in system prompt or verifier for these requests and a cap of at least 8000 characters, returning the model's raw text in `reply`. Alternatively, register the nine actions as tools that are **returned in `tool_calls` without being executed**, since PlanMate does the executing.
+
+### Tool-calling mode (`LLM_TOOLS=on`)
+
+The recommended setting for small tool-calling models such as the hackathon's Qwen2.5-1.5B (When2Call-trained). Instead of writing PlanMate's JSON, the model picks one of PlanMate's tools in its **native tool-call format**. The tools are written into the system prompt exactly as Qwen2.5's chat template does (`<tools>…</tools>`), and its `<tool_call>` answer is read back. This works through the `system` field (`LLM_AGENT_PROMPT=system`); the model server needs no changes. Definitions are in [lib/planner/tools.ts](../lib/planner/tools.ts).
+
+- **Simple tools, as in When2Call:** `schedule_tasks`, `change_current_plan`, `update_task_status(task, status)`, `remove_item(ref)`, `add_calendar_event(title)`, `assign_task(assignee, title, due_date)`, `email_assigner(task, reason)`, `answer_yes`, `answer_no` and `take_plan_off`. No tool call means the model answers or asks itself.
+- **Only relevant tools are offered:** yes/no only when something awaits a decision, plan changes only when there is a plan, assigning only for leaders.
+- **Code does the heavy parts:**
+  - a plan's sessions and estimates, using small model questions in [stepwise.ts](../lib/planner/stepwise.ts) and [revise.ts](../lib/planner/revise.ts);
+  - an event's exact time, in [events.ts](../lib/planner/events.ts).
+- **Checks before anything changes:**
+  - a removal must name the item in the user's own words, and "move" never deletes;
+  - "paper 1" / "first paper" picks that numbered task;
+  - an email needs a reason the user actually gave;
+  - references with extra words ("T3 Demo slides") are cleaned up.
+- **Only the latest message is sent** (plus PlanMate's previous reply when it was a question). Given older turns, a small model repeats its previous tool call.
+
+Measured on 2026-11-19 with the friend's server: 14/14 everyday commands, twice. Most actions take 1–3 s; a new plan takes about 20 s.
 
 ## Checking the model on its own
 

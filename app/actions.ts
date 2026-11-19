@@ -18,7 +18,6 @@ import {
   handleChatMessage,
   resolveEmail,
   resolveHeldAssignments,
-  undoPlanFromCard,
 } from "@/lib/planner/agent";
 import { takeNotifications } from "@/lib/notifications";
 import { setBlockCompleted } from "@/lib/tasks";
@@ -92,15 +91,6 @@ export async function sendChatMessage(input: z.input<typeof messageSchema>) {
     const result = await handleChatMessage({ user, ...messageSchema.parse(input) });
     // A confirmed plan or status change alters the calendar and task pages.
     if (result.dataChanged) refresh();
-    return result;
-  });
-}
-
-/** The "Undo" button on a plan card: takes that plan off the calendar. */
-export async function undoPlan(messageId: string) {
-  return authed(async (user) => {
-    const result = await undoPlanFromCard(user, z.string().parse(messageId));
-    refresh();
     return result;
   });
 }

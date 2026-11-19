@@ -161,7 +161,7 @@
     "type": "function",
     "function": {
       "name": "remove",
-      "description": "Delete exactly identified tasks (T#) or sessions (S#). Only when unambiguous.",
+      "description": "Delete exactly identified tasks (T#), sessions (S#) or fixed events (E#). Only when unambiguous.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -178,6 +178,9 @@
                   "type": "string"
                 },
                 "session": {
+                  "type": "string"
+                },
+                "event": {
                   "type": "string"
                 }
               }
@@ -279,6 +282,71 @@
         "required": [
           "reply",
           "email"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "event",
+      "description": "Put a fixed appointment on the calendar at an exact time (a meeting, class, call), once or every week. New plans work around it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "reply": {
+            "type": "string",
+            "description": "What the user reads in the chat."
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "title",
+                "date",
+                "start"
+              ],
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "date": {
+                  "type": "string",
+                  "description": "YYYY-MM-DD"
+                },
+                "start": {
+                  "type": "string",
+                  "description": "HH:MM, 24-hour"
+                },
+                "minutes": {
+                  "type": "number"
+                },
+                "repeat": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "weekly"
+                  ]
+                },
+                "category": {
+                  "type": "string",
+                  "enum": [
+                    "work",
+                    "study",
+                    "personal",
+                    "exercise",
+                    "rest"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "reply",
+          "events"
         ],
         "additionalProperties": false
       }

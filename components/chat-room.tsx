@@ -8,7 +8,6 @@ import {
   openChat,
   resolveAssignment,
   sendChatMessage,
-  undoPlan,
 } from "@/app/actions";
 import { AssistantOrb } from "@/components/brand";
 import PlanCard from "@/components/plan-card";
@@ -187,25 +186,6 @@ export default function ChatRoom({
     setSessions((current) => [
       { id: session.id, title: session.title, preview: reply.content },
       ...current.filter(({ id }) => id !== session.id),
-    ]);
-  };
-
-  const handleUndo = async (messageId: string) => {
-    setResolvingId(messageId);
-    const result = await undoPlan(messageId);
-    setResolvingId(undefined);
-
-    if (!result.ok) {
-      setMessages((current) => [...current, errorMessage(result.error)]);
-      return;
-    }
-    setMessages((current) => [
-      ...current.map((message) =>
-        message.id === messageId
-          ? { ...message, planStatus: result.data.planStatus }
-          : message,
-      ),
-      result.data.message,
     ]);
   };
 
@@ -424,8 +404,6 @@ export default function ChatRoom({
                   <PlanCard
                     proposal={message.plan}
                     status={message.planStatus}
-                    busy={resolvingId === message.id || isThinking}
-                    onUndo={() => void handleUndo(message.id)}
                   />
                 )}
                 {message.email && message.emailStatus && (

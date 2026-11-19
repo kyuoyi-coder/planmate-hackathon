@@ -49,6 +49,8 @@ const itemSchema = z.preprocess(
     category: z.enum(CATEGORIES).catch("work"),
     priority: z.enum(PRIORITIES).catch("medium"),
     dueDate: optionalDate,
+    /** Not before this day, e.g. an item moved to next week. */
+    startDate: optionalDate.optional(),
     notes: z.string().max(1000).optional().catch(undefined),
     steps: z.array(stepSchema).min(1).max(60),
   }),
@@ -120,13 +122,38 @@ export const removalsSchema = z
       .object({
         task: z.coerce.string().trim().min(1).optional(),
         session: z.coerce.string().trim().min(1).optional(),
+        /** A fixed event ("E1"), with every repeat of it. */
+        event: z.coerce.string().trim().min(1).optional(),
       })
-      .refine((removal) => removal.task || removal.session),
+      .refine((removal) => removal.task || removal.session || removal.event),
   )
   .min(1)
   .max(40);
 
 export type Removal = z.infer<typeof removalsSchema>[number];
+
+/**
+ * A fixed event the user told the agent about: "a meeting every Friday at
+ * 2pm". Unlike planned work it has an exact time, and may repeat weekly.
+ */
+export const eventsSchema = z
+  .array(
+    z.object({
+      title: z.string().trim().min(1).max(120),
+      /** The first (or only) day, "YYYY-MM-DD". */
+      date: z.string().refine(isDate),
+      /** "HH:mm", 24-hour. */
+      start: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
+      minutes: z.coerce.number().int().min(5).max(12 * 60).catch(60),
+      repeat: z.enum(["none", "weekly"]).catch("none"),
+      category: z.enum(CATEGORIES).catch("work"),
+      /** The user gave no length, so an hour was assumed; the reply says so. */
+      lengthAssumed: z.boolean().optional().catch(undefined),
+    }),
+  )
+  .min(1)
+  .max(5);
+export type EventRequest = z.infer<typeof eventsSchema>[number];
 
 export const assignmentsSchema = z
   .array(
@@ -154,6 +181,7 @@ export const modelOutputSchema = z.object({
       "assign",
       "remove",
       "email",
+      "event",
       "chat",
     ])
     .catch("chat"),
@@ -165,6 +193,7 @@ export const modelOutputSchema = z.object({
   assignments: z.unknown().optional(),
   removals: z.unknown().optional(),
   email: z.unknown().optional(),
+  events: z.unknown().optional(),
 });
 
 /**
@@ -191,6 +220,7 @@ export type ModelOutput = {
     | "assign"
     | "remove"
     | "email"
+    | "event"
     | "chat";
   reply: string;
   plan?: PlanIntent;
@@ -203,6 +233,7 @@ export type ModelOutput = {
   assignments?: Assignment[];
   removals?: Removal[];
   email?: EmailRequest;
+  events?: EventRequest[];
 };
 
 export type ProposedBlock = {
@@ -284,6 +315,8 @@ export type PlannerContext = {
    */
   /** A message to an assigner the user hasn't sent or cancelled yet. */
   pendingEmail?: { task: string; to: string };
+  /** Fixed events on the calendar ("E1"), so the model can remove one. */
+  events?: { ref: string; title: string; when: string }[];
   heldAssignments?: {
     assignee: string;
     title: string;

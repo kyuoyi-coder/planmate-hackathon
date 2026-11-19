@@ -86,3 +86,73 @@ export function resolveUserDates(text: string, today: string): string[] {
   }
   return lines;
 }
+
+export type Period = { dueDate?: string; startDate?: string; endDate?: string };
+
+/**
+ * The period a whole message covers: "this week" ends on Sunday, "next week"
+ * is next Monday to Sunday, "in 5 days" / "next 3 days" ends that many days
+ * from today (today included), and a named day ("by Friday") is a deadline.
+ */
+export function periodOf(text: string, today: string): Period {
+  const lower = text.toLowerCase();
+  const sunday = nextWeekday(today, 0);
+  if (/\bnext week\b/.test(lower)) {
+    return { startDate: addDays(sunday, 1), endDate: addDays(sunday, 7), dueDate: addDays(sunday, 7) };
+  }
+  const days = lower.match(/\b(?:in|within|next|for|over) (?:the next )?(\d{1,2}|two|three|four|five|six|seven) (?:working |work |week)?days\b/);
+  if (days) {
+    const words: Record<string, number> = { two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7 };
+    const count = Number(days[1]) || words[days[1]] || 1;
+    // "5 working days" skips the weekend.
+    if (/working days|work days|weekdays/.test(days[0])) {
+      let date = today;
+      let left = weekdayOf(today) % 6 === 0 ? count : count - 1;
+      while (left > 0) {
+        date = addDays(date, 1);
+        if (weekdayOf(date) % 6 !== 0) left--;
+      }
+      return { dueDate: date, endDate: date };
+    }
+    const end = addDays(today, Math.max(0, count - 1));
+    return { dueDate: end, endDate: end };
+  }
+  if (/\bthis week\b(?!end)|\bwithin (?:the|this) week\b/.test(lower)) return { dueDate: sunday, endDate: sunday };
+  const due = dueDateIn(lower, today);
+  return due ? { dueDate: due } : {};
+}
+
+/** A deadline named in one part of a message: "by Friday", "next Tuesday", "tomorrow", "the 25th". */
+export function dueDateIn(text: string, today: string): string | undefined {
+  const lower = text.toLowerCase();
+  if (/\btoday\b|\btonight\b/.test(lower)) return today;
+  if (/\btomorrow\b/.test(lower)) return addDays(today, 1);
+  const named = lower.match(new RegExp(`\\b(next |this |on |by |before |until )?(${DAY_PATTERN})\\b`));
+  if (named && (DAY_NAMES.includes(named[2]) || named[1])) {
+    const weekday = dayIndex(named[2]);
+    if (weekday !== undefined) {
+      const sunday = nextWeekday(today, 0);
+      return named[1]?.trim() === "next" ? nextWeekday(addDays(sunday, 1), weekday) : nextWeekday(today, weekday);
+    }
+  }
+  const nth = lower.match(/\b(?:the )?(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (nth) {
+    for (let offset = 0; offset < 62; offset++) {
+      const date = addDays(today, offset);
+      if (Number(date.slice(8)) === Number(nth[1])) return date;
+    }
+  }
+  return undefined;
+}
+
+/** Every date in [from, to] that falls on one of the weekdays named in `text` ("keep Sunday free"). */
+export function weekdaysNamedIn(text: string, from: string, to: string): string[] {
+  const lower = text.toLowerCase();
+  const wanted = DAY_NAMES.map((name, index) => (new RegExp(`\\b${name}s?\\b`).test(lower) ? index : -1)).filter((i) => i >= 0);
+  if (/\bweekends?\b/.test(lower)) wanted.push(0, 6);
+  const dates: string[] = [];
+  for (let date = from; date <= to; date = addDays(date, 1)) {
+    if (wanted.includes(weekdayOf(date))) dates.push(date);
+  }
+  return dates;
+}

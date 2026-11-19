@@ -103,9 +103,18 @@ export const blocks = pgTable(
       .default("work"),
     /** Ticked off on the calendar. Drives the task's status: see lib/tasks.ts. */
     completed: boolean("completed").notNull().default(false),
+    /**
+     * A fixed event the user told the agent about ("a meeting every Friday at
+     * 2pm"): every copy of it shares this id, so it can be removed as one.
+     * Null for planned work sessions.
+     */
+    seriesId: text("series_id"),
     createdAt: createdAt(),
   },
-  (table) => [index("blocks_user_start_idx").on(table.userId, table.start)],
+  (table) => [
+    index("blocks_user_start_idx").on(table.userId, table.start),
+    index("blocks_series_idx").on(table.seriesId),
+  ],
 );
 
 export const chatSessions = pgTable(

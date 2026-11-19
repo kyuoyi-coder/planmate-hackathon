@@ -175,6 +175,9 @@
               },
               "session": {
                 "type": "string"
+              },
+              "event": {
+                "type": "string"
               }
             }
           }
@@ -270,6 +273,68 @@
         "action",
         "reply",
         "email"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "action": {
+          "const": "event"
+        },
+        "reply": {
+          "type": "string",
+          "description": "What the user reads in the chat."
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "title",
+              "date",
+              "start"
+            ],
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "date": {
+                "type": "string",
+                "description": "YYYY-MM-DD"
+              },
+              "start": {
+                "type": "string",
+                "description": "HH:MM, 24-hour"
+              },
+              "minutes": {
+                "type": "number"
+              },
+              "repeat": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "weekly"
+                ]
+              },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "work",
+                  "study",
+                  "personal",
+                  "exercise",
+                  "rest"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "required": [
+        "action",
+        "reply",
+        "events"
       ],
       "additionalProperties": false
     },
